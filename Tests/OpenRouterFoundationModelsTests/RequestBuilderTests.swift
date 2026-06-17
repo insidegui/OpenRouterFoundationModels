@@ -95,6 +95,49 @@ import Testing
     #expect(built.request.toolChoice == .required)
   }
 
+  @Test func `tool names are sanitized for OpenAI compatible providers`() throws {
+    let request = LanguageModelExecutorGenerationRequest.make(
+      transcript: Transcript(entries: [
+        .prompt(.init(segments: [.text(.init(content: "Hi"))])),
+        .toolCalls(
+          .init([
+            .init(
+              id: "call_1",
+              toolName: "Email Search",
+              arguments: try GeneratedContent(json: #"{"query":"John"}"#)
+            )
+          ])
+        ),
+        .toolOutput(
+          .init(
+            id: "call_1",
+            toolName: "Email Search",
+            segments: [.text(.init(content: "Found John"))]
+          )
+        ),
+      ]),
+      enabledTools: [
+        .init(name: "Email Search", description: "Search mail", parameters: TestArgs.generationSchema)
+      ]
+    )
+
+    let built = try RequestBuilder.build(from: request, model: .init(id: "test/model"))
+
+    #expect(built.request.tools?[0].function.name == "Email_Search")
+    #expect(built.request.messages[1].toolCalls?[0].function.name == "Email_Search")
+    #expect(built.request.messages[2].name == "Email_Search")
+    #expect(built.toolNameMapping.wireToOriginalNames["Email_Search"] == "Email Search")
+  }
+
+  @Test func `tool name sanitization resolves collisions deterministically`() throws {
+    let mapping = ToolNameMapping(toolNames: ["Email Search", "Email_Search"])
+
+    #expect(mapping.wireName(for: "Email Search") == "Email_Search")
+    #expect(mapping.wireName(for: "Email_Search") == "Email_Search_2")
+    #expect(mapping.wireToOriginalNames["Email_Search"] == "Email Search")
+    #expect(mapping.wireToOriginalNames["Email_Search_2"] == "Email_Search")
+  }
+
   @Test func `structured schema becomes strict response_format`() throws {
     let request = LanguageModelExecutorGenerationRequest.make(
       transcript: Transcript(entries: [.prompt(.init(segments: [.text(.init(content: "Plan"))]))]),

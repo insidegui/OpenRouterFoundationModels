@@ -77,6 +77,30 @@ import Testing
     ])
   }
 
+  @Test func `maps wire tool names back to original FoundationModels names`() async throws {
+    let events = try await recordedEvents { channel in
+      try await EventTranslator(
+        toolCallsEntryID: "tools",
+        wireToolNames: ["Email_Search": "Email Search"]
+      ).translate(
+        stream(chunks: [
+          #"{"id":"gen","choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"Email_Search","arguments":"{\"query\":\"John\"}"}}]},"finish_reason":"tool_calls"}]}"#
+        ]),
+        into: channel
+      )
+    }
+
+    #expect(events == [
+      .toolCallArguments(
+        entryID: "tools",
+        id: "call_1",
+        name: "Email Search",
+        arguments: #"{"query":"John"}"#,
+        tokenCount: 1
+      )
+    ])
+  }
+
   @Test func `throws choice errors`() async throws {
     let error = try await #require(throws: APIError.self) {
       _ = try await recordedEvents { channel in

@@ -67,7 +67,7 @@ public struct OpenRouterExecutor: LanguageModelExecutor {
   ) async throws {
     do {
       let built = try RequestBuilder.build(from: request, model: configuration.model)
-      try await stream(built.request, into: channel)
+      try await stream(built.request, toolNameMapping: built.toolNameMapping, into: channel)
     } catch {
       throw ErrorMapper.map(error)
     }
@@ -75,9 +75,10 @@ public struct OpenRouterExecutor: LanguageModelExecutor {
 
   private func stream(
     _ request: ChatCompletionRequest,
+    toolNameMapping: ToolNameMapping,
     into channel: LanguageModelExecutorGenerationChannel
   ) async throws {
-    try await EventTranslator().translate(
+    try await EventTranslator(wireToolNames: toolNameMapping.wireToOriginalNames).translate(
       client.stream(request, headers: try authHeaders()),
       into: channel
     )

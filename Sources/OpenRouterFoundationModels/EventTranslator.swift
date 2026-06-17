@@ -6,15 +6,18 @@ struct EventTranslator: Sendable {
   let responseEntryID: String
   let reasoningEntryID: String
   let toolCallsEntryID: String
+  let wireToolNames: [String: String]
 
   init(
     responseEntryID: String = UUID().uuidString,
     reasoningEntryID: String = UUID().uuidString,
-    toolCallsEntryID: String = UUID().uuidString
+    toolCallsEntryID: String = UUID().uuidString,
+    wireToolNames: [String: String] = [:]
   ) {
     self.responseEntryID = responseEntryID
     self.reasoningEntryID = reasoningEntryID
     self.toolCallsEntryID = toolCallsEntryID
+    self.wireToolNames = wireToolNames
   }
 
   func translate(
@@ -118,7 +121,7 @@ struct EventTranslator: Sendable {
 
       await sendToolCall(
         id: id,
-        name: name,
+        name: wireToolNames[name] ?? name,
         arguments: state.arguments.isEmpty ? "{}" : state.arguments,
         tokenCount: Self.deltaTokenCount,
         to: channel

@@ -6,6 +6,7 @@ enum RequestBuilder {
   struct Built {
     var request: ChatCompletionRequest
     var isStructured: Bool
+    var toolNameMapping: ToolNameMapping
   }
 
   static func build(
@@ -14,6 +15,7 @@ enum RequestBuilder {
   ) throws -> Built {
     var messages: [ChatMessage] = []
     var systemParts: [String] = []
+    let toolNameMapping = ToolNameMapping(toolNames: toolNames(in: request))
 
     for entry in request.transcript {
       switch entry {
@@ -33,11 +35,15 @@ enum RequestBuilder {
         }
 
       case .toolCalls(let calls):
-        messages.append(.assistant(toolCalls: calls.map(toolCall)))
+        messages.append(.assistant(toolCalls: calls.map { toolCall($0, mapping: toolNameMapping) }))
 
       case .toolOutput(let output):
         messages.append(
-          .tool(id: output.id, name: output.toolName, content: text(of: output.segments))
+          .tool(
+            id: output.id,
+            name: toolNameMapping.wireName(for: output.toolName),
+            content: text(of: output.segments)
+          )
         )
 
       case .reasoning:
@@ -61,7 +67,7 @@ enum RequestBuilder {
         ?? model.maximumResponseTokens,
       tools: request.enabledToolDefinitions.isEmpty
         ? nil
-        : request.enabledToolDefinitions.map(toolDefinition),
+        : request.enabledToolDefinitions.map { toolDefinition($0, mapping: toolNameMapping) },
       toolChoice: toolChoice(for: request.generationOptions.toolCallingMode),
       reasoning: reasoning(for: request.contextOptions, model: model),
       includeReasoning: model.capabilities.reasoning ? true : nil,
@@ -98,7 +104,11 @@ enum RequestBuilder {
       }
     }
 
-    return Built(request: chatRequest, isStructured: isStructured)
+    return Built(
+      request: chatRequest,
+      isStructured: isStructured,
+      toolNameMapping: toolNameMapping
+    )
   }
 
   static func jsonSchema(from schema: GenerationSchema) -> JSONValue {
@@ -213,18 +223,38 @@ enum RequestBuilder {
     }
   }
 
-  private static func toolDefinition(_ definition: Transcript.ToolDefinition) -> ToolDefinition {
+  private static func toolNames(in request: LanguageModelExecutorGenerationRequest) -> [String] {
+    var names = request.enabledToolDefinitions.map(\.name)
+    for entry in request.transcript {
+      switch entry {
+      case .toolCalls(let calls):
+        names.append(contentsOf: calls.map(\.toolName))
+      case .toolOutput(let output):
+        names.append(output.toolName)
+      case .instructions, .prompt, .reasoning, .response:
+        break
+      @unknown default:
+        break
+      }
+    }
+    return names
+  }
+
+  private static func toolDefinition(
+    _ definition: Transcript.ToolDefinition,
+    mapping: ToolNameMapping
+  ) -> ToolDefinition {
     ToolDefinition(
-      name: definition.name,
+      name: mapping.wireName(for: definition.name),
       description: definition.description,
       parameters: jsonSchema(from: definition.parameters)
     )
   }
 
-  private static func toolCall(_ call: Transcript.ToolCall) -> ToolCall {
+  private static func toolCall(_ call: Transcript.ToolCall, mapping: ToolNameMapping) -> ToolCall {
     ToolCall(
       id: call.id,
-      name: call.toolName,
+      name: mapping.wireName(for: call.toolName),
       arguments: call.arguments.jsonString
     )
   }
