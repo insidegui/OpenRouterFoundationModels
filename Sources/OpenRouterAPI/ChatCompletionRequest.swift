@@ -337,9 +337,25 @@ package struct FunctionCall: Sendable, Hashable, Codable {
   package var name: String?
   package var arguments: String
 
-  package init(name: String? = nil, arguments: String) {
+  package init(name: String? = nil, arguments: String = "") {
     self.name = name
     self.arguments = arguments
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case name, arguments
+  }
+
+  package init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    name = try container.decodeIfPresent(String.self, forKey: .name)
+    arguments = try container.decodeIfPresent(String.self, forKey: .arguments) ?? ""
+  }
+
+  package func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encodeIfPresent(name, forKey: .name)
+    try container.encode(arguments, forKey: .arguments)
   }
 }
 

@@ -86,4 +86,26 @@ import Testing
     #expect(chunk.choices[0].delta?.toolCalls?[0].id == "call_1")
     #expect(chunk.choices[0].delta?.toolCalls?[0].function.name == "lookup")
   }
+
+  @Test func `streaming tool call function arguments default to empty when omitted`() throws {
+    let json = #"""
+    {
+      "id": "gen",
+      "choices": [{
+        "index": 0,
+        "delta": {
+          "tool_calls": [{
+            "index": 0,
+            "id": "call_1",
+            "type": "function",
+            "function": {"name": "lookup"}
+          }]
+        }
+      }]
+    }
+    """#
+
+    let chunk = try JSONDecoder().decode(ChatCompletionChunk.self, from: Data(json.utf8))
+    #expect(chunk.choices[0].delta?.toolCalls?[0].function.arguments == "")
+  }
 }
