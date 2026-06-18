@@ -17,6 +17,10 @@ enum RequestBuilder {
     var systemParts: [String] = []
     let toolNameMapping = ToolNameMapping(toolNames: toolNames(in: request))
 
+    OpenRouterLog.request.notice(
+      "Building request id=\(request.id.uuidString, privacy: .public) model=\(model.id, privacy: .public) transcriptEntries=\(request.transcript.count) enabledTools=\(request.enabledToolDefinitions.count)"
+    )
+
     for entry in request.transcript {
       switch entry {
       case .instructions(let instructions):
@@ -74,6 +78,19 @@ enum RequestBuilder {
       stream: true
     )
 
+    for definition in request.enabledToolDefinitions {
+      let wireName = toolNameMapping.wireName(for: definition.name)
+      if wireName == definition.name {
+        OpenRouterLog.request.debug(
+          "Tool name accepted by provider original=\(definition.name, privacy: .public)"
+        )
+      } else {
+        OpenRouterLog.request.notice(
+          "Mapped FoundationModels tool name original=\(definition.name, privacy: .public) wire=\(wireName, privacy: .public)"
+        )
+      }
+    }
+
     applySampling(request.generationOptions, to: &chatRequest)
 
     let isStructured = request.schema != nil
@@ -103,6 +120,10 @@ enum RequestBuilder {
         }
       }
     }
+
+    OpenRouterLog.request.notice(
+      "Built request id=\(request.id.uuidString, privacy: .public) messages=\(chatRequest.messages.count) tools=\(chatRequest.tools?.count ?? 0) hasSchema=\(isStructured) hasReasoning=\(chatRequest.reasoning != nil) toolChoice=\(String(describing: chatRequest.toolChoice), privacy: .public)"
+    )
 
     return Built(
       request: chatRequest,

@@ -65,10 +65,22 @@ public struct OpenRouterExecutor: LanguageModelExecutor {
     model: OpenRouterLanguageModel,
     streamingInto channel: LanguageModelExecutorGenerationChannel
   ) async throws {
+    OpenRouterLog.executor.notice(
+      "Executor respond started requestID=\(request.id.uuidString, privacy: .public) configuredModel=\(configuration.model.id, privacy: .public) sessionModel=\(model.model.id, privacy: .public)"
+    )
     do {
       let built = try RequestBuilder.build(from: request, model: configuration.model)
+      OpenRouterLog.executor.notice(
+        "Executor built request requestID=\(request.id.uuidString, privacy: .public) wireTools=\(built.request.tools?.count ?? 0)"
+      )
       try await stream(built.request, toolNameMapping: built.toolNameMapping, into: channel)
+      OpenRouterLog.executor.notice(
+        "Executor respond completed requestID=\(request.id.uuidString, privacy: .public)"
+      )
     } catch {
+      OpenRouterLog.executor.error(
+        "Executor respond failed requestID=\(request.id.uuidString, privacy: .public): \(String(describing: error), privacy: .public)"
+      )
       throw ErrorMapper.map(error)
     }
   }
@@ -78,10 +90,14 @@ public struct OpenRouterExecutor: LanguageModelExecutor {
     toolNameMapping: ToolNameMapping,
     into channel: LanguageModelExecutorGenerationChannel
   ) async throws {
+    OpenRouterLog.executor.notice(
+      "Executor streaming request model=\(request.model, privacy: .public) mappedToolNames=\(toolNameMapping.wireToOriginalNames.count)"
+    )
     try await EventTranslator(wireToolNames: toolNameMapping.wireToOriginalNames).translate(
       client.stream(request, headers: try authHeaders()),
       into: channel
     )
+    OpenRouterLog.executor.notice("Executor stream returned to respond")
   }
 
   private func authHeaders() throws -> [String: String] {

@@ -22,6 +22,9 @@ package struct OpenRouterClient: Sendable {
   ) async throws -> ChatCompletionResponse {
     var body = request
     body.stream = false
+    OpenRouterAPILog.network.notice(
+      "Sending non-streaming chat request model=\(body.model, privacy: .public) messages=\(body.messages.count) tools=\(body.tools?.count ?? 0)"
+    )
     let (data, response) = try await transport.data(
       for: urlRequest(path: "chat/completions", method: "POST", body: body, headers: headers)
     )
@@ -40,23 +43,43 @@ package struct OpenRouterClient: Sendable {
         do {
           var body = request
           body.stream = true
+          OpenRouterAPILog.network.notice(
+            "Starting streaming chat request model=\(body.model, privacy: .public) messages=\(body.messages.count) tools=\(body.tools?.count ?? 0)"
+          )
           let (bytes, response) = try await transport.bytes(
             for: urlRequest(path: "chat/completions", method: "POST", body: body, headers: headers)
           )
+          if let http = response as? HTTPURLResponse {
+            OpenRouterAPILog.network.notice(
+              "Streaming chat response headers received status=\(http.statusCode)"
+            )
+          }
           if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
             var body = Data()
             for try await byte in bytes { body.append(byte) }
             try Self.check(response, body: body)
           }
           for try await event in SSEParser.events(from: bytes) {
+            OpenRouterAPILog.network.debug(
+              "Streaming chunk received choices=\(event.choices.count) hasUsage=\(event.usage != nil)"
+            )
             continuation.yield(event)
           }
+          OpenRouterAPILog.network.notice("Streaming chat request completed")
           continuation.finish()
         } catch {
+          OpenRouterAPILog.network.error(
+            "Streaming chat request failed: \(String(describing: error), privacy: .public)"
+          )
           continuation.finish(throwing: error)
         }
       }
-      continuation.onTermination = { _ in task.cancel() }
+      continuation.onTermination = { termination in
+        OpenRouterAPILog.network.notice(
+          "Streaming chat continuation terminated: \(String(describing: termination), privacy: .public)"
+        )
+        task.cancel()
+      }
     }
   }
 
