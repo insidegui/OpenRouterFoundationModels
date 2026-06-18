@@ -202,6 +202,22 @@ import Testing
     #expect(built.request.seed == 9)
     #expect(built.request.reasoning?.effort == .high)
     #expect(built.request.includeReasoning == true)
+    #expect(built.forwardsReasoning)
+  }
+
+  @Test func `reasoning is not requested just because the model supports it`() throws {
+    let request = LanguageModelExecutorGenerationRequest.make(
+      transcript: Transcript(entries: [.prompt(.init(segments: [.text(.init(content: "Hi"))]))])
+    )
+
+    let built = try RequestBuilder.build(
+      from: request,
+      model: .init(id: "test/model", capabilities: .init(reasoning: true))
+    )
+
+    #expect(built.request.reasoning == nil)
+    #expect(built.request.includeReasoning == nil)
+    #expect(!built.forwardsReasoning)
   }
 }
 

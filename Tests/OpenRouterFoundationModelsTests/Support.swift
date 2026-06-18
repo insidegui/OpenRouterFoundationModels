@@ -51,6 +51,13 @@ enum RecordedEvent: Equatable {
     outputTotal: Int,
     outputReasoning: Int
   )
+  case toolCallsUsage(
+    entryID: String?,
+    inputTotal: Int,
+    inputCached: Int,
+    outputTotal: Int,
+    outputReasoning: Int
+  )
   case reasoningText(entryID: String?, text: String, tokenCount: Int)
   case toolCallArguments(
     entryID: String?,
@@ -111,6 +118,14 @@ enum RecordedEvent: Equatable {
         default:
           self = .other(String(describing: call.action))
         }
+      case .updateUsage(let usage):
+        self = .toolCallsUsage(
+          entryID: toolCalls.entryID,
+          inputTotal: usage.input.totalTokenCount,
+          inputCached: usage.input.cachedTokenCount,
+          outputTotal: usage.output.totalTokenCount,
+          outputReasoning: usage.output.reasoningTokenCount
+        )
       default:
         self = .other(String(describing: toolCalls.action))
       }

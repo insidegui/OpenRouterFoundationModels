@@ -7,6 +7,7 @@ enum RequestBuilder {
     var request: ChatCompletionRequest
     var isStructured: Bool
     var toolNameMapping: ToolNameMapping
+    var forwardsReasoning: Bool
   }
 
   static func build(
@@ -64,6 +65,7 @@ enum RequestBuilder {
       messages.insert(.system(systemParts.joined(separator: "\n\n")), at: 0)
     }
 
+    let reasoningConfig = reasoning(for: request.contextOptions, model: model)
     var chatRequest = ChatCompletionRequest(
       model: model.id,
       messages: messages,
@@ -73,8 +75,8 @@ enum RequestBuilder {
         ? nil
         : request.enabledToolDefinitions.map { toolDefinition($0, mapping: toolNameMapping) },
       toolChoice: toolChoice(for: request.generationOptions.toolCallingMode),
-      reasoning: reasoning(for: request.contextOptions, model: model),
-      includeReasoning: model.capabilities.reasoning ? true : nil,
+      reasoning: reasoningConfig,
+      includeReasoning: reasoningConfig == nil ? nil : true,
       stream: true
     )
 
@@ -128,7 +130,8 @@ enum RequestBuilder {
     return Built(
       request: chatRequest,
       isStructured: isStructured,
-      toolNameMapping: toolNameMapping
+      toolNameMapping: toolNameMapping,
+      forwardsReasoning: reasoningConfig != nil
     )
   }
 

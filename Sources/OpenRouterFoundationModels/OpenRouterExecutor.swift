@@ -73,7 +73,12 @@ public struct OpenRouterExecutor: LanguageModelExecutor {
       OpenRouterLog.executor.notice(
         "Executor built request requestID=\(request.id.uuidString, privacy: .public) wireTools=\(built.request.tools?.count ?? 0)"
       )
-      try await stream(built.request, toolNameMapping: built.toolNameMapping, into: channel)
+      try await stream(
+        built.request,
+        toolNameMapping: built.toolNameMapping,
+        forwardsReasoning: built.forwardsReasoning,
+        into: channel
+      )
       OpenRouterLog.executor.notice(
         "Executor respond completed requestID=\(request.id.uuidString, privacy: .public)"
       )
@@ -88,12 +93,16 @@ public struct OpenRouterExecutor: LanguageModelExecutor {
   private func stream(
     _ request: ChatCompletionRequest,
     toolNameMapping: ToolNameMapping,
+    forwardsReasoning: Bool,
     into channel: LanguageModelExecutorGenerationChannel
   ) async throws {
     OpenRouterLog.executor.notice(
-      "Executor streaming request model=\(request.model, privacy: .public) mappedToolNames=\(toolNameMapping.wireToOriginalNames.count)"
+      "Executor streaming request model=\(request.model, privacy: .public) mappedToolNames=\(toolNameMapping.wireToOriginalNames.count) forwardsReasoning=\(forwardsReasoning)"
     )
-    try await EventTranslator(wireToolNames: toolNameMapping.wireToOriginalNames).translate(
+    try await EventTranslator(
+      wireToolNames: toolNameMapping.wireToOriginalNames,
+      forwardsReasoning: forwardsReasoning
+    ).translate(
       client.stream(request, headers: try authHeaders()),
       into: channel
     )
