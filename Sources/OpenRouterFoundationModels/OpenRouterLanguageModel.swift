@@ -61,7 +61,7 @@ extension OpenRouterLanguageModel: LanguageModel {
     if model.capabilities.imageInput {
       capabilities.append(.vision)
     }
-    return LanguageModelCapabilities(capabilities: capabilities)
+    return LanguageModelCapabilities(capabilities)
   }
 
   public var executorConfiguration: OpenRouterExecutor.Configuration {
